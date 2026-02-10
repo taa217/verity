@@ -1,0 +1,385 @@
+import os
+import json
+from typing import Annotated, TypedDict, List, Dict, Any, Literal
+
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+# ---------------------------------------------------------------------------
+# State
+# ---------------------------------------------------------------------------
+class AgentState(TypedDict):
+    messages: Annotated[list, add_messages]
+    visual_state: Dict[str, Any]       # { code, scenes }
+    execution_status: Literal[
+        "idle", "planning", "coding", "fixing"
+    ]
+    error_log: List[str]
+
+
+# ---------------------------------------------------------------------------
+# Models  (stable GA releases — no flaky preview disconnects)
+# ---------------------------------------------------------------------------
+llm_planner = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0.7,
+    timeout=120,
+    max_retries=3,
+)
+llm_coder = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0.5,          # lower temp → more reliable code
+    timeout=120,
+    max_retries=3,
+)
+llm_router = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0.0,
+    timeout=30,
+    max_retries=2,
+)
+
+
+def get_text(response) -> str:
+    """Extract plain text from an LLM response (handles string / list parts)."""
+    c = response.content
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        parts = []
+        for p in c:
+            if isinstance(p, dict) and p.get("type") == "text":
+                parts.append(p["text"])
+            elif isinstance(p, str):
+                parts.append(p)
+            else:
+                parts.append(str(p))
+        return "".join(parts)
+    return str(c)
+
+
+def strip_fences(text: str) -> str:
+    """Remove markdown fences and stray language labels."""
+    text = text.strip()
+    # Remove opening fences with optional language
+    import re
+    text = re.sub(r'^```[a-zA-Z]*\s*\n?', '', text)
+    # Remove closing fences
+    text = re.sub(r'\n?```\s*$', '', text)
+    # Remove stray language labels at start
+    text = re.sub(r'^(javascript|typescript|jsx|tsx|json|js|ts)\s*\n', '', text)
+    return text.strip()
+
+
+# ---------------------------------------------------------------------------
+# Prompts
+# ---------------------------------------------------------------------------
+
+ROUTER_PROMPT = """You are a Router. Classify the user message into exactly one type.
+
+Output ONLY a JSON object: {"type": "<type>"}
+
+Types:
+- "new_topic"   → user wants a NEW lesson/explanation (e.g. "Explain derivatives")
+- "modification" → user wants to CHANGE the current lesson (e.g. "slow down", "add color")
+- "fix_error"   → message starts with "System Error:" — a runtime bug report
+
+Default to "new_topic" if unsure."""
+
+
+LESSON_PLANNER_PROMPT = """You are a Pedagogical Architect. You design animated visual lessons that feel
+like 3Blue1Brown / Manim videos.
+
+Given a topic, produce a scene-by-scene lesson plan.
+
+Guidelines:
+- 6-10 scenes total (first scene = title/hook, last = summary/outro)
+- Each scene should have a clear visual goal and exactly one key insight
+- Narration should be conversational, clear, and build intuition progressively
+- Duration should reflect how long the visual + narration need (3000-12000ms typically)
+- Visuals must be describable with SVG (paths, shapes, text, math symbols)
+- Think about what ANIMATES — lines drawing, elements fading, things moving
+
+Output ONLY valid JSON (no markdown fences):
+{
+  "title": "Lesson title",
+  "scenes": [
+    {
+      "id": 1,
+      "duration": 4000,
+      "narration": "What the narrator says during this scene",
+      "visual_description": "Detailed description of what should appear visually",
+      "animation_notes": "What animates in/out, transitions, timing"
+    }
+  ]
+}"""
+
+
+LESSON_CODER_PROMPT = """You are an expert React developer who creates animated educational lessons.
+You produce a single self-contained React component that plays like a video — scene-based,
+with smooth animations and optional narration.
+
+=== ALLOWED TECH (nothing else) ===
+- React: useState, useEffect, useRef, useCallback, useMemo
+- framer-motion: motion.*, AnimatePresence (already in scope — do NOT import)
+- SVG: all standard SVG elements for graphics
+- Inline styles only
+- window.speechSynthesis for narration (browser API — no import needed)
+
+=== EXACT CODE PATTERN TO FOLLOW ===
+
+function App() {
+  const [currentScene, setCurrentScene] = useState(0);
+
+  const scenes = [
+    { id: 1, duration: 5000, narration: "..." },
+    { id: 2, duration: 8000, narration: "..." },
+  ];
+
+  // Colors
+  const c = {
+    bg: "#0c0f14",
+    cyan: "#00F6BB",
+    purple: "#7C3AED",
+    yellow: "#EAB308",
+    white: "#F5F7FA",
+    faint: "rgba(255,255,255,0.1)",
+  };
+
+  // Auto-start
+  useEffect(() => { setCurrentScene(1); }, []);
+
+  // Scene progression + narration
+  useEffect(() => {
+    if (currentScene === 0) return;
+    const scene = scenes.find(s => s.id === currentScene);
+    if (!scene) return;
+
+    // Browser TTS
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(scene.narration);
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+
+    // Advance after duration
+    const timer = setTimeout(() => {
+      if (currentScene < scenes.length) {
+        setCurrentScene(prev => prev + 1);
+      }
+    }, scene.duration);
+
+    return () => {
+      clearTimeout(timer);
+      window.speechSynthesis.cancel();
+    };
+  }, [currentScene]);
+
+  return (
+    <div style={{
+      width: '100%', height: '100%', background: c.bg, color: c.white,
+      position: 'relative', overflow: 'hidden',
+      fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif",
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    }}>
+      <AnimatePresence mode="wait">
+        {currentScene === 1 && (
+          <motion.div key="s1" exit={{ opacity: 0 }}
+            style={{ width: '100%', height: '100%', position: 'relative' }}>
+            {/* SVG + motion elements here */}
+          </motion.div>
+        )}
+        {/* More scenes... */}
+      </AnimatePresence>
+
+      {/* Progress bar */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, height: 4,
+                    background: c.faint, width: '100%' }}>
+        <motion.div
+          style={{ height: '100%', background: c.cyan }}
+          animate={{ width: currentScene > 0
+            ? (currentScene / scenes.length * 100) + '%' : '0%' }}
+        />
+      </div>
+    </div>
+  );
+}
+
+=== VISUAL STYLE ===
+- Dark background (#0c0f14) — cinematic, clean
+- Accent colors: Cyan #00F6BB, Purple #7C3AED, Yellow #EAB308
+- White text: #F5F7FA, faint lines: rgba(255,255,255,0.1)
+- Clean mathematical aesthetic (like 3Blue1Brown / Manim)
+- Generous spacing, readable font sizes (24-48px for main content)
+
+=== SVG TECHNIQUES ===
+- Use viewBox="0 0 800 450" for consistent aspect ratio
+- motion.path with initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} for line-drawing
+- motion.circle, motion.rect for animated shapes
+- SVG <text> for math / labels, or absolutely-positioned divs over SVG for richer text
+- Unicode math symbols: ×, ÷, √, ∫, ∑, ∏, π, θ, Δ, ∂, ∞, ≈, ≠, ≤, ≥, ², ³
+- Gradient definitions in <defs> for visual polish
+
+=== ANIMATION TECHNIQUES ===
+- Stagger children with transition={{ delay: i * 0.3 }}
+- Use initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} for reveals
+- Use exit={{ opacity: 0 }} on all scene containers for clean transitions
+- motion.path pathLength animations for drawing effects
+- Scale/rotate for emphasis: animate={{ scale: [1, 1.1, 1] }}
+- Color transitions via animate={{ color: "..." }}
+
+=== STRICT RULES ===
+1. Output ONLY `function App() { ... }` — NO imports, NO exports
+2. Never wrap in markdown fences. Never output "javascript" / "jsx" / "tsx" as text.
+3. Every scene must have meaningful SVG visuals — NOT just centered text.
+4. Include a progress bar at the bottom.
+5. The component must auto-start and auto-advance through all scenes.
+6. Use window.speechSynthesis for narration (it's available in the browser).
+7. All styles must be inline objects — no CSS classes.
+8. Make it visually impressive — use animations, SVG paths, gradients, motion effects.
+9. Ensure proper cleanup in useEffect return functions (cancel timers, cancel speech).
+10. For the title scene, always include an animated SVG element (not just text).
+
+Now implement this lesson plan:
+"""
+
+
+LESSON_FIXER_PROMPT = """You are a Code Fixer for animated React lesson components.
+
+You will receive:
+1. Code that caused an error
+2. The error message
+
+Fix the error and return ONLY the corrected function App() { ... } code.
+
+Rules:
+- NO imports, NO exports
+- Only use: React hooks (useState, useEffect, useRef, useCallback, useMemo),
+  framer-motion (motion.*, AnimatePresence), SVG elements, inline styles
+- window.speechSynthesis is available (browser API)
+- Never wrap in markdown fences
+- Never output language labels
+- Do not explain the error — just return fixed code
+"""
+
+
+# ---------------------------------------------------------------------------
+# Graph Nodes
+# ---------------------------------------------------------------------------
+
+def router_node(state: AgentState):
+    """Classify the incoming message."""
+    messages = state["messages"]
+    last = messages[-1]
+
+    # Fast-path: system error messages
+    if isinstance(last, HumanMessage) and str(last.content).startswith("System Error:"):
+        return {"execution_status": "fixing"}
+
+    response = llm_router.invoke([
+        SystemMessage(content=ROUTER_PROMPT),
+        last,
+    ])
+    try:
+        text = get_text(response)
+        decision = json.loads(strip_fences(text))
+        dtype = decision.get("type", "new_topic")
+        if dtype == "fix_error":
+            return {"execution_status": "fixing"}
+        return {"execution_status": "planning"}
+    except Exception:
+        return {"execution_status": "planning"}
+
+
+def planner_node(state: AgentState):
+    """Design the lesson scene-by-scene."""
+    messages = state["messages"]
+    response = llm_planner.invoke(
+        [SystemMessage(content=LESSON_PLANNER_PROMPT)] + messages
+    )
+    return {"messages": [response]}
+
+
+def coder_node(state: AgentState):
+    """Generate or fix the React lesson component."""
+    execution_status = state.get("execution_status", "coding")
+
+    if execution_status == "fixing":
+        # ---- Error-fix flow ----
+        messages = state["messages"]
+        last = messages[-1]
+        current_code = state.get("visual_state", {}).get("code", "")
+
+        response = llm_coder.invoke([
+            SystemMessage(content=LESSON_FIXER_PROMPT),
+            HumanMessage(
+                content=f"Current Code:\n{current_code}\n\nError:\n{last.content}"
+            ),
+        ])
+        code = strip_fences(get_text(response))
+        return {
+            "visual_state": {"code": code},
+            "execution_status": "coding",
+        }
+
+    # ---- Normal generation flow ----
+    messages = state["messages"]
+    plan_text = get_text(messages[-1]) if messages else ""
+
+    # Try to parse scenes from plan for metadata
+    scenes_meta = []
+    try:
+        plan_data = json.loads(strip_fences(plan_text))
+        scenes_meta = plan_data.get("scenes", [])
+    except Exception:
+        pass
+
+    response = llm_coder.invoke([
+        SystemMessage(content=LESSON_CODER_PROMPT),
+        HumanMessage(content=plan_text),
+    ])
+    code = strip_fences(get_text(response))
+
+    return {
+        "visual_state": {
+            "code": code,
+            "scenes": scenes_meta,
+        },
+        "execution_status": "coding",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Graph Construction
+# ---------------------------------------------------------------------------
+workflow = StateGraph(AgentState)
+
+workflow.add_node("router", router_node)
+workflow.add_node("planner", planner_node)
+workflow.add_node("coder", coder_node)
+
+workflow.add_edge(START, "router")
+
+
+def route_decision(state: AgentState) -> str:
+    if state.get("execution_status") == "fixing":
+        return "coder"
+    return "planner"
+
+
+workflow.add_conditional_edges(
+    "router",
+    route_decision,
+    {"coder": "coder", "planner": "planner"},
+)
+
+workflow.add_edge("planner", "coder")
+workflow.add_edge("coder", END)
+
+app = workflow.compile()
