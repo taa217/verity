@@ -5,6 +5,7 @@ from typing import List, Optional, Dict, Any
 import logging
 
 from app.agent import app as agent_app
+from app.tts import router as tts_router
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -21,6 +22,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register sub-routers
+app.include_router(tts_router)
 
 
 # ---------------------------------------------------------------------------

@@ -133,7 +133,10 @@ with smooth animations and optional narration.
 - framer-motion: motion.*, AnimatePresence (already in scope — do NOT import)
 - SVG: all standard SVG elements for graphics
 - Inline styles only
-- window.speechSynthesis for narration (browser API — no import needed)
+- TTS functions (already in scope — do NOT import):
+  * speak(text, { onEnd, onError }) — speaks with natural Cartesia AI voice, auto-falls back to browser TTS
+  * cancelSpeech() — stops current speech
+  * prefetchSpeech(text) — silently pre-loads audio for upcoming scenes
 
 === EXACT CODE PATTERN TO FOLLOW ===
 
@@ -158,6 +161,13 @@ function App() {
   // Auto-start
   useEffect(() => { setCurrentScene(1); }, []);
 
+  // Prefetch next scene's audio when current scene starts
+  useEffect(() => {
+    if (currentScene === 0) return;
+    const nextScene = scenes.find(s => s.id === currentScene + 1);
+    if (nextScene) prefetchSpeech(nextScene.narration);
+  }, [currentScene]);
+
   // Scene progression + narration (waits for BOTH timer AND speech to finish)
   useEffect(() => {
     if (currentScene === 0) return;
@@ -177,14 +187,12 @@ function App() {
       }
     }
 
-    // Browser TTS
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(scene.narration);
-    utterance.rate = 0.95;
-    utterance.pitch = 1.0;
-    utterance.onend = () => { speechDone = true; tryAdvance(); };
-    utterance.onerror = () => { speechDone = true; tryAdvance(); };
-    window.speechSynthesis.speak(utterance);
+    // TTS (Cartesia AI voice with browser fallback)
+    cancelSpeech();
+    speak(scene.narration, {
+      onEnd: () => { speechDone = true; tryAdvance(); },
+      onError: () => { speechDone = true; tryAdvance(); },
+    });
 
     // Minimum duration timer
     const timer = setTimeout(() => {
@@ -195,7 +203,7 @@ function App() {
     return () => {
       cancelled = true;
       clearTimeout(timer);
-      window.speechSynthesis.cancel();
+      cancelSpeech();
     };
   }, [currentScene]);
 
@@ -258,13 +266,15 @@ function App() {
 3. Every scene must have meaningful SVG visuals — NOT just centered text.
 4. Include a progress bar at the bottom.
 5. The component must auto-start and auto-advance through all scenes.
-6. Use window.speechSynthesis for narration (it's available in the browser).
+6. Use speak() / cancelSpeech() / prefetchSpeech() for narration (already in scope).
+   NEVER use window.speechSynthesis directly — always use speak() and cancelSpeech().
    CRITICAL: Scenes must wait for BOTH the duration timer AND speech to finish before advancing.
-   Use the onend/onerror callbacks on SpeechSynthesisUtterance — never advance on timer alone.
+   Use the onEnd/onError callbacks in speak(text, { onEnd, onError }) — never advance on timer alone.
 7. All styles must be inline objects — no CSS classes.
 8. Make it visually impressive — use animations, SVG paths, gradients, motion effects.
-9. Ensure proper cleanup in useEffect return functions (cancel timers, cancel speech).
+9. Ensure proper cleanup in useEffect return functions (cancel timers, cancelSpeech()).
 10. For the title scene, always include an animated SVG element (not just text).
+11. Prefetch next scene audio: when a scene starts, call prefetchSpeech(nextScene.narration).
 
 Now implement this lesson plan:
 """
@@ -282,9 +292,10 @@ Rules:
 - NO imports, NO exports
 - Only use: React hooks (useState, useEffect, useRef, useCallback, useMemo),
   framer-motion (motion.*, AnimatePresence), SVG elements, inline styles
-- window.speechSynthesis is available (browser API)
+- TTS functions are in scope (do NOT import): speak(text, { onEnd, onError }), cancelSpeech(), prefetchSpeech(text)
+- NEVER use window.speechSynthesis directly — always use speak() and cancelSpeech().
 - CRITICAL: Scene progression must wait for BOTH the duration timer AND speech to finish.
-  Use onend/onerror callbacks on SpeechSynthesisUtterance — never advance on timer alone.
+  Use onEnd/onError callbacks in speak(text, { onEnd, onError }) — never advance on timer alone.
   Pattern: track speechDone + timerDone flags, call tryAdvance() from both callbacks.
 - Never wrap in markdown fences
 - Never output language labels
