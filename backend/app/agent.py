@@ -102,7 +102,10 @@ Guidelines:
 - 6-10 scenes total (first scene = title/hook, last = summary/outro)
 - Each scene should have a clear visual goal and exactly one key insight
 - Narration should be conversational, clear, and build intuition progressively
-- Duration should reflect how long the visual + narration need (3000-12000ms typically)
+- Duration is the MINIMUM time the scene stays on screen (3000-12000ms typically).
+  The scene will also wait for narration to finish, so duration should match animation time.
+  Estimate narration length: ~130 words per minute at 0.95x speed. A 30-word narration ≈ 14 seconds.
+  Set duration to at LEAST match your expected narration time, or longer for complex animations.
 - Visuals must be describable with SVG (paths, shapes, text, math symbols)
 - Think about what ANIMATES — lines drawing, elements fading, things moving
 
@@ -155,27 +158,42 @@ function App() {
   // Auto-start
   useEffect(() => { setCurrentScene(1); }, []);
 
-  // Scene progression + narration
+  // Scene progression + narration (waits for BOTH timer AND speech to finish)
   useEffect(() => {
     if (currentScene === 0) return;
     const scene = scenes.find(s => s.id === currentScene);
     if (!scene) return;
+
+    let speechDone = false;
+    let timerDone = false;
+    let cancelled = false;
+
+    function tryAdvance() {
+      if (cancelled) return;
+      if (speechDone && timerDone) {
+        if (currentScene < scenes.length) {
+          setCurrentScene(prev => prev + 1);
+        }
+      }
+    }
 
     // Browser TTS
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(scene.narration);
     utterance.rate = 0.95;
     utterance.pitch = 1.0;
+    utterance.onend = () => { speechDone = true; tryAdvance(); };
+    utterance.onerror = () => { speechDone = true; tryAdvance(); };
     window.speechSynthesis.speak(utterance);
 
-    // Advance after duration
+    // Minimum duration timer
     const timer = setTimeout(() => {
-      if (currentScene < scenes.length) {
-        setCurrentScene(prev => prev + 1);
-      }
+      timerDone = true;
+      tryAdvance();
     }, scene.duration);
 
     return () => {
+      cancelled = true;
       clearTimeout(timer);
       window.speechSynthesis.cancel();
     };
@@ -241,6 +259,8 @@ function App() {
 4. Include a progress bar at the bottom.
 5. The component must auto-start and auto-advance through all scenes.
 6. Use window.speechSynthesis for narration (it's available in the browser).
+   CRITICAL: Scenes must wait for BOTH the duration timer AND speech to finish before advancing.
+   Use the onend/onerror callbacks on SpeechSynthesisUtterance — never advance on timer alone.
 7. All styles must be inline objects — no CSS classes.
 8. Make it visually impressive — use animations, SVG paths, gradients, motion effects.
 9. Ensure proper cleanup in useEffect return functions (cancel timers, cancel speech).
@@ -263,6 +283,9 @@ Rules:
 - Only use: React hooks (useState, useEffect, useRef, useCallback, useMemo),
   framer-motion (motion.*, AnimatePresence), SVG elements, inline styles
 - window.speechSynthesis is available (browser API)
+- CRITICAL: Scene progression must wait for BOTH the duration timer AND speech to finish.
+  Use onend/onerror callbacks on SpeechSynthesisUtterance — never advance on timer alone.
+  Pattern: track speechDone + timerDone flags, call tryAdvance() from both callbacks.
 - Never wrap in markdown fences
 - Never output language labels
 - Do not explain the error — just return fixed code
