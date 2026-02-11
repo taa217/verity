@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import "./App.css";
 
 import Sidebar from "./components/Sidebar";
@@ -13,6 +13,26 @@ import VisualizationLoader from "./components/VisualizationLoader";
 interface Message {
   role: "user" | "assistant";
   content: string;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+const MOBILE_BREAKPOINT = 768;
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => window.innerWidth <= MOBILE_BREAKPOINT,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  return isMobile;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,6 +68,8 @@ const IDLE_CODE = `function App() {
 // App
 // ---------------------------------------------------------------------------
 function App() {
+  const isMobile = useIsMobile();
+
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [code, setCode] = useState(IDLE_CODE);
@@ -59,12 +81,22 @@ function App() {
   const [envReady, setEnvReady] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // Auto-collapse sidebar on mobile
+  useEffect(() => {
+    setSidebarCollapsed(isMobile);
+  }, [isMobile]);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const isHero = !hasInteracted && messages.length === 0;
   const showOverlayLoader = isLoading || !envReady;
 
   const handleEnvReady = useCallback(() => setEnvReady(true), []);
+
+  // Close sidebar when navigating on mobile
+  const closeSidebarOnMobile = useCallback(() => {
+    if (isMobile) setSidebarCollapsed(true);
+  }, [isMobile]);
 
   // ---- New session — reset everything ----
   const handleNewSession = () => {
@@ -183,15 +215,48 @@ function App() {
   );
 
   // ---- Render ----
+  const sidebarOpen = !sidebarCollapsed;
+
   return (
     <div className="app-layout">
+      {/* Backdrop overlay for mobile sidebar */}
+      {isMobile && sidebarOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
+
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        onNewSession={handleNewSession}
+        onNewSession={() => {
+          handleNewSession();
+          closeSidebarOnMobile();
+        }}
       />
 
       <main className="main-content">
+        {/* Mobile top bar with menu toggle */}
+        {isMobile && (
+          <div className="mobile-topbar">
+            <button
+              className="mobile-topbar__menu"
+              onClick={() => setSidebarCollapsed(false)}
+              aria-label="Open menu"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+            <div className="mobile-topbar__brand">
+              <div className="mobile-topbar__logo">V</div>
+              <span className="mobile-topbar__name">Verity</span>
+            </div>
+            <div className="mobile-topbar__spacer" />
+          </div>
+        )}
+
         {isHero ? (
           <HeroView
             input={input}
@@ -210,13 +275,13 @@ function App() {
                     onClick={() => setShowChat(!showChat)}
                     className={showChat ? "active" : ""}
                   >
-                    {showChat ? "Hide Transcript" : "Show Transcript"}
+                    {showChat ? "Hide Transcript" : "Transcript"}
                   </button>
                   <button
                     onClick={() => setShowCode(!showCode)}
                     className={showCode ? "active" : ""}
                   >
-                    {showCode ? "Hide Code" : "Show Code"}
+                    {showCode ? "Hide Code" : "Code"}
                   </button>
                 </div>
               )}

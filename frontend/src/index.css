@@ -44,13 +44,29 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh; /* dynamic viewport height for mobile */
   background: var(--bg-color);
   overflow: hidden;
+  /* Prevent pull-to-refresh on mobile */
+  overscroll-behavior: none;
 }
 
 #root {
   width: 100%;
   height: 100vh;
+  height: 100dvh;
+}
+
+/* Prevent iOS tap highlight on interactive elements */
+a, button, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure touch targets are at least 44px on mobile */
+@media (max-width: 768px) {
+  button {
+    min-height: 36px;
+  }
 }
 
 h1, h2, h3, h4, h5, h6 {

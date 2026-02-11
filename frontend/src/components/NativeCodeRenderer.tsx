@@ -121,32 +121,38 @@ export default function NativeCodeRenderer({
   }
 
   // ------ Render ------
+  const isMobile = window.innerWidth <= 768;
+
   return (
     <div
+      className="code-renderer"
       style={{
         width: "100%",
         height: "100%",
         display: "flex",
-        flexDirection: "row",
+        flexDirection: isMobile && showCode ? "column" : "row",
         background: "#0c0f14",
       }}
     >
       {/* Optional code panel */}
       {showCode && (
         <div
+          className="code-renderer__source"
           style={{
-            width: "42%",
-            height: "100%",
-            borderRight: "1px solid rgba(255,255,255,0.08)",
+            width: isMobile ? "100%" : "42%",
+            height: isMobile ? "35%" : "100%",
+            borderRight: isMobile ? "none" : "1px solid rgba(255,255,255,0.08)",
+            borderBottom: isMobile ? "1px solid rgba(255,255,255,0.08)" : "none",
             overflow: "auto",
             background: "#0d1117",
+            flexShrink: 0,
           }}
         >
           <pre
             style={{
               margin: 0,
-              padding: 16,
-              fontSize: 13,
+              padding: isMobile ? 12 : 16,
+              fontSize: isMobile ? 11 : 13,
               lineHeight: 1.6,
               fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
               color: "#c9d1d9",
@@ -161,9 +167,10 @@ export default function NativeCodeRenderer({
 
       {/* Live preview */}
       <div
+        className="code-renderer__preview"
         style={{
           flex: 1,
-          height: "100%",
+          minHeight: 0,
           position: "relative",
           overflow: "hidden",
           background: "#0c0f14",

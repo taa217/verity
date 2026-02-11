@@ -875,22 +875,324 @@
 }
 
 /* =============================================================================
-   RESPONSIVE
+   MOBILE TOP BAR (visible only on mobile via isMobile in App.tsx)
+   ============================================================================= */
+
+.mobile-topbar {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+  flex-shrink: 0;
+  gap: 10px;
+  /* Safe area for notched phones */
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+
+.mobile-topbar__menu {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: #475569;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-topbar__menu:active {
+  background: #f1f5f9;
+}
+
+.mobile-topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-topbar__logo {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #2dd4bf, #14b8a6);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.mobile-topbar__name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: -0.02em;
+}
+
+.mobile-topbar__spacer {
+  flex: 1;
+}
+
+/* =============================================================================
+   SIDEBAR BACKDROP (mobile overlay)
+   ============================================================================= */
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 199;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* =============================================================================
+   RESPONSIVE — MOBILE (≤ 768px)
    ============================================================================= */
 
 @media (max-width: 768px) {
+  /* ---- Sidebar: slide-over overlay ---- */
   .sidebar:not(.sidebar--collapsed) {
     position: fixed;
     z-index: 200;
     height: 100vh;
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+    height: 100dvh;
+    width: 280px;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+    animation: slideInSidebar 0.22s ease-out;
   }
 
-  .chat-overlay {
-    width: calc(100% - 24px);
+  .sidebar--collapsed {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    border: none;
+  }
+
+  /* ---- Hero ---- */
+  .hero {
+    padding: 1.5rem 1rem;
+    justify-content: flex-start;
+    padding-top: 15vh;
   }
 
   .hero__title {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero__subtitle {
+    font-size: 0.85rem;
+    margin-top: 16px;
+    padding: 0 8px;
+  }
+
+  .hero__shortcuts {
+    margin-top: 10px;
+  }
+
+  /* ---- Chat input (prevent iOS zoom: >= 16px) ---- */
+  .chat-input {
+    font-size: 16px;
+    padding: 12px 48px 12px 14px;
+    border-radius: 12px;
+  }
+
+  .chat-input-container {
+    max-width: 100%;
+  }
+
+  .send-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  /* ---- Lesson view ---- */
+  .lesson-view {
+    height: 100%;
+  }
+
+  .visual-area {
+    margin: 6px 6px 0;
+    border-radius: 12px;
+  }
+
+  .visual-controls {
+    top: 8px;
+    right: 8px;
+    gap: 4px;
+  }
+
+  .visual-controls button {
+    padding: 6px 10px;
+    font-size: 0.72rem;
+    border-radius: 6px;
+    /* Ensure good touch target */
+    min-height: 34px;
+  }
+
+  /* ---- Chat overlay: full-width sheet ---- */
+  .chat-overlay {
+    width: calc(100% - 12px);
+    left: 6px;
+    top: 6px;
+    max-height: calc(100% - 60px);
+    border-radius: 12px;
+  }
+
+  .chat-overlay-header {
+    padding: 12px 14px;
+  }
+
+  .chat-messages {
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .message-bubble {
+    max-width: 92%;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+  }
+
+  /* ---- Lesson bottom input ---- */
+  .lesson-input {
+    padding: 8px 8px;
+    /* Safe area for bottom-notch phones */
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .lesson-input .chat-input-container {
+    max-width: 100%;
+  }
+
+  /* ---- Loader ---- */
+  .loader__ring-wrap {
+    width: 72px;
+    height: 72px;
+    margin-bottom: 20px;
+  }
+
+  .loader__ring {
+    width: 100%;
+    height: 100%;
+  }
+
+  .loader__arc {
+    transform-origin: 60px 60px;
+  }
+
+  .loader__logo {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+    border-radius: 9px;
+  }
+
+  .loader__title {
+    font-size: 1.05rem;
+  }
+
+  .loader__sub {
+    font-size: 0.78rem;
+    margin-bottom: 20px;
+  }
+
+  .loader__phrase {
+    margin-bottom: 20px;
+  }
+
+  .loader__phrase span {
+    font-size: 0.72rem;
+  }
+
+  .loader__actions {
+    flex-direction: column;
+    width: 100%;
+    max-width: 200px;
+    gap: 8px;
+  }
+
+  .loader__btn {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .loader__blob--1 {
+    width: 120px;
+    height: 120px;
+  }
+
+  .loader__blob--2 {
+    width: 100px;
+    height: 100px;
+  }
+}
+
+/* Slide-in animation for sidebar on mobile */
+@keyframes slideInSidebar {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* =============================================================================
+   RESPONSIVE — SMALL MOBILE (≤ 380px)
+   ============================================================================= */
+
+@media (max-width: 380px) {
+  .hero__title {
+    font-size: 1.25rem;
+  }
+
+  .hero {
+    padding: 1.25rem 0.75rem;
+    padding-top: 10vh;
+  }
+
+  .visual-controls button {
+    padding: 5px 8px;
+    font-size: 0.68rem;
+  }
+
+  .mobile-topbar {
+    padding: 8px 10px;
+  }
+
+  .chat-overlay {
+    width: calc(100% - 8px);
+    left: 4px;
+    top: 4px;
+  }
+}
+
+/* =============================================================================
+   RESPONSIVE — TABLET (769px - 1024px)
+   ============================================================================= */
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar:not(.sidebar--collapsed) {
+    width: 220px;
+  }
+
+  .chat-overlay {
+    width: 300px;
+  }
+
+  .hero__title {
+    font-size: 1.85rem;
   }
 }
