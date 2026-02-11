@@ -13,7 +13,7 @@ from app.tts import router as tts_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Verity Teaching Agent")
+app = FastAPI(title="Lucid Teaching Agent")
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,7 +56,7 @@ def _extract_text(content) -> str:
 # ---------------------------------------------------------------------------
 @app.get("/")
 async def root():
-    return {"message": "Verity Agent API is running"}
+    return {"message": "Lucid Agent API is running"}
 
 
 @app.post("/chat")

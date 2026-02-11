@@ -74,6 +74,11 @@
   flex-shrink: 0;
 }
 
+.sidebar__logo-svg {
+  flex-shrink: 0;
+  display: block;
+}
+
 .sidebar__name {
   font-size: 1.2rem;
   font-weight: 700;
@@ -743,15 +748,11 @@
   transform: translate(-50%, -50%);
   width: 38px;
   height: 38px;
-  background: linear-gradient(135deg, #2dd4bf, #14b8a6);
-  border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-weight: 800;
-  font-size: 17px;
   animation: glow 2.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 12px rgba(0, 220, 196, 0.35));
 }
 
 @keyframes glow {
@@ -928,6 +929,11 @@
   font-weight: 800;
   font-size: 13px;
   flex-shrink: 0;
+}
+
+.mobile-topbar__logo-svg {
+  flex-shrink: 0;
+  display: block;
 }
 
 .mobile-topbar__name {

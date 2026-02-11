@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, RotateCcw } from "lucide-react";
+import LucidLogo from "./LucidLogo";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,7 +95,9 @@ export default function VisualizationLoader({
                 <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" />
                 <circle cx="60" cy="60" r="50" fill="none" stroke="url(#lg)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="80 234" className="loader__arc" />
               </svg>
-              <div className="loader__logo">V</div>
+              <div className="loader__logo">
+                <LucidLogo size={28} />
+              </div>
             </div>
 
             <h2 className="loader__title">Creating your lesson</h2>

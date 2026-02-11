@@ -3,7 +3,7 @@ from app.agent import app
 from langchain_core.messages import HumanMessage
 
 async def test_agent():
-    print("Testing Verity Agent...")
+    print("Testing Lucid Agent...")
     
     # Simulate a user request
     inputs = {"messages": [HumanMessage(content="Explain the concept of a sine wave visually.")]}

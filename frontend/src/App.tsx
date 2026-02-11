@@ -6,6 +6,7 @@ import HeroView from "./components/HeroView";
 import ChatInput from "./components/ChatInput";
 import NativeCodeRenderer from "./components/NativeCodeRenderer";
 import VisualizationLoader from "./components/VisualizationLoader";
+import LucidLogo from "./components/LucidLogo";
 import { prefetchAllScenes, cancelAllPrefetches, cancelSpeech } from "./services/ttsService";
 
 // ---------------------------------------------------------------------------
@@ -262,8 +263,8 @@ function App() {
               </svg>
             </button>
             <div className="mobile-topbar__brand">
-              <div className="mobile-topbar__logo">V</div>
-              <span className="mobile-topbar__name">Verity</span>
+              <LucidLogo size={26} className="mobile-topbar__logo-svg" />
+              <span className="mobile-topbar__name">Lucid</span>
             </div>
             <div className="mobile-topbar__spacer" />
           </div>

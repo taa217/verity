@@ -7,6 +7,7 @@ import {
   PanelLeft,
   Clock,
 } from "lucide-react";
+import LucidLogo from "./LucidLogo";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,8 +55,8 @@ export default function Sidebar({
           {/* Header */}
           <div className="sidebar__head">
             <div className="sidebar__brand">
-              <div className="sidebar__logo">V</div>
-              <span className="sidebar__name">Verity</span>
+              <LucidLogo size={30} className="sidebar__logo-svg" />
+              <span className="sidebar__name">Lucid</span>
             </div>
             <button
               className="sidebar__icon-btn"

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 216" fill="none">
+  <defs>
+    <linearGradient id="left-arm" x1="34" y1="133" x2="114" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2B2DA8"/>
+      <stop offset="100%" stop-color="#204EA5"/>
+    </linearGradient>
+    <linearGradient id="top-arm" x1="102" y1="20" x2="116" y2="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2A93B8"/>
+      <stop offset="100%" stop-color="#2AC2D5"/>
+    </linearGradient>
+    <linearGradient id="right-arm" x1="112" y1="97" x2="183" y2="89" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#26A4C2"/>
+      <stop offset="100%" stop-color="#17D9CD"/>
+    </linearGradient>
+    <linearGradient id="bottom-arm" x1="115" y1="100" x2="109" y2="191" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1A5AAE"/>
+      <stop offset="100%" stop-color="#2CA3C8"/>
+    </linearGradient>
+    <linearGradient id="left-inner" x1="50" y1="132" x2="111" y2="42" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#161E7A"/>
+      <stop offset="100%" stop-color="#1D2F89"/>
+    </linearGradient>
+    <linearGradient id="right-inner" x1="114" y1="111" x2="170" y2="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#176AAE"/>
+      <stop offset="100%" stop-color="#1B8CC3"/>
+    </linearGradient>
+    <linearGradient id="bottom-inner" x1="124" y1="102" x2="122" y2="176" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#11508F"/>
+      <stop offset="100%" stop-color="#1B80B5"/>
+    </linearGradient>
+    <radialGradient id="overlap-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(108 108) rotate(90) scale(36)">
+      <stop offset="0%" stop-color="#2A9CC6" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#2A9CC6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <path d="M34 133 C58 123 81 112 95 98 C108 85 111 63 109 28" stroke="url(#left-arm)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M103 20 C109 43 114 68 113 93" stroke="url(#top-arm)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M113 97 C133 95 153 92 183 90" stroke="url(#right-arm)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M113 97 C112 124 112 156 109 191" stroke="url(#bottom-arm)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M50 133 C73 124 90 113 101 99 C111 86 114 67 113 43" stroke="url(#left-inner)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M114 111 C134 107 150 100 170 92" stroke="url(#right-inner)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M124 102 C123 128 123 152 122 176" stroke="url(#bottom-inner)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="108" cy="108" r="26" fill="url(#overlap-glow)"/>
+</svg>
