@@ -1,22 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   /* Brand Palette */
-  --color-primary: #0D1B3E;
-  /* Midnight Blue */
-  --color-accent: #00F6BB;
-  /* Electric Teal */
-  --color-neutral: #F5F7FA;
-  /* Cloud Gray */
-  --color-secondary: #4A5C80;
-  /* Slate Blue */
+  --color-primary: #1e293b;
+  --color-accent: #2dd4bf;
+  --color-accent-dark: #14b8a6;
+  --color-neutral: #f8fafc;
+  --color-secondary: #64748b;
+  --color-border: #e2e8f0;
+  --color-surface: #ffffff;
 
   /* Usage */
-  --bg-color: var(--color-neutral);
+  --bg-color: var(--color-surface);
   --text-color: var(--color-primary);
   --text-secondary: var(--color-secondary);
 
@@ -44,40 +44,28 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  /* Subtle gradient background */
-  background: radial-gradient(circle at 10% 10%, rgba(13, 27, 62, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 90% 90%, rgba(0, 246, 187, 0.05) 0%, transparent 40%),
-    var(--bg-color);
-  overflow-x: hidden;
+  background: var(--bg-color);
+  overflow: hidden;
 }
 
 #root {
   width: 100%;
+  height: 100vh;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   color: var(--color-primary);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 0.5em;
-}
-
 p {
-  font-size: 1.1em;
+  font-size: 1rem;
   color: var(--color-secondary);
   line-height: 1.6;
+}
+
+/* Minimal global button reset */
+button {
+  font-family: inherit;
 }
