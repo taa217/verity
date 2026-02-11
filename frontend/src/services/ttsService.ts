@@ -129,6 +129,7 @@ function _speakBrowser(
 
   utterance.onerror = () => {
     _currentUtterance = null;
+    onError?.();
     onEnd?.(); // treat errors as "done" so scene advances
   };
 
