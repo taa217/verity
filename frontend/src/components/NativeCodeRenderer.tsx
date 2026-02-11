@@ -4,7 +4,7 @@ import * as ReactLive from "react-live";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { toReactLiveSnippet } from "../utils/aiCodeTransform";
-import { speak, cancelSpeech, prefetchSpeech } from "../services/ttsService";
+import { speak, cancelSpeech, prefetchSpeech, prefetchAllScenes } from "../services/ttsService";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,6 +59,7 @@ export default function NativeCodeRenderer({
       speak,
       cancelSpeech,
       prefetchSpeech,
+      prefetchAllScenes,
     }),
     [],
   );

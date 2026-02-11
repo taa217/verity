@@ -6,6 +6,7 @@ import HeroView from "./components/HeroView";
 import ChatInput from "./components/ChatInput";
 import NativeCodeRenderer from "./components/NativeCodeRenderer";
 import VisualizationLoader from "./components/VisualizationLoader";
+import { prefetchAllScenes, cancelAllPrefetches, cancelSpeech } from "./services/ttsService";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -100,6 +101,8 @@ function App() {
 
   // ---- New session — reset everything ----
   const handleNewSession = () => {
+    cancelAllPrefetches();
+    cancelSpeech();
     setInput("");
     setMessages([]);
     setCode(IDLE_CODE);
@@ -136,6 +139,15 @@ function App() {
       setMessages((prev) => [...prev, { role: "assistant", content: text }]);
 
       if (data.visual_state?.code) {
+        // Prefetch ALL scene audio BEFORE rendering the lesson component.
+        // This gives the TTS service a head start so audio is cached by the
+        // time each scene calls speak().
+        if (data.visual_state.scenes?.length) {
+          const narrations = data.visual_state.scenes
+            .map((s: { narration?: string }) => s.narration)
+            .filter(Boolean) as string[];
+          prefetchAllScenes(narrations);
+        }
         setCode(data.visual_state.code);
       }
     } catch (err) {

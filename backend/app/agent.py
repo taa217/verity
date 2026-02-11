@@ -136,7 +136,8 @@ with smooth animations and optional narration.
 - TTS functions (already in scope — do NOT import):
   * speak(text, { onEnd, onError }) — speaks with natural Cartesia AI voice, auto-falls back to browser TTS
   * cancelSpeech() — stops current speech
-  * prefetchSpeech(text) — silently pre-loads audio for upcoming scenes
+  * prefetchSpeech(text) — silently pre-loads audio for a single upcoming scene
+  * prefetchAllScenes(narrations[]) — pre-loads ALL scene audio in parallel (call on mount!)
 
 === EXACT CODE PATTERN TO FOLLOW ===
 
@@ -158,10 +159,13 @@ function App() {
     faint: "rgba(255,255,255,0.1)",
   };
 
-  // Auto-start
-  useEffect(() => { setCurrentScene(1); }, []);
+  // Auto-start + prefetch ALL scene audio upfront for smooth playback
+  useEffect(() => {
+    prefetchAllScenes(scenes.map(s => s.narration));
+    setCurrentScene(1);
+  }, []);
 
-  // Prefetch next scene's audio when current scene starts
+  // Also prefetch next scene individually as a safety net
   useEffect(() => {
     if (currentScene === 0) return;
     const nextScene = scenes.find(s => s.id === currentScene + 1);
@@ -266,7 +270,7 @@ function App() {
 3. Every scene must have meaningful SVG visuals — NOT just centered text.
 4. Include a progress bar at the bottom.
 5. The component must auto-start and auto-advance through all scenes.
-6. Use speak() / cancelSpeech() / prefetchSpeech() for narration (already in scope).
+6. Use speak() / cancelSpeech() / prefetchSpeech() / prefetchAllScenes() for narration (already in scope).
    NEVER use window.speechSynthesis directly — always use speak() and cancelSpeech().
    CRITICAL: Scenes must wait for BOTH the duration timer AND speech to finish before advancing.
    Use the onEnd/onError callbacks in speak(text, { onEnd, onError }) — never advance on timer alone.
@@ -274,7 +278,8 @@ function App() {
 8. Make it visually impressive — use animations, SVG paths, gradients, motion effects.
 9. Ensure proper cleanup in useEffect return functions (cancel timers, cancelSpeech()).
 10. For the title scene, always include an animated SVG element (not just text).
-11. Prefetch next scene audio: when a scene starts, call prefetchSpeech(nextScene.narration).
+11. CRITICAL: On mount, call prefetchAllScenes(scenes.map(s => s.narration)) to pre-load ALL audio in parallel.
+    Also prefetch next scene per-scene as backup: prefetchSpeech(nextScene.narration).
 
 Now implement this lesson plan:
 """
@@ -292,7 +297,7 @@ Rules:
 - NO imports, NO exports
 - Only use: React hooks (useState, useEffect, useRef, useCallback, useMemo),
   framer-motion (motion.*, AnimatePresence), SVG elements, inline styles
-- TTS functions are in scope (do NOT import): speak(text, { onEnd, onError }), cancelSpeech(), prefetchSpeech(text)
+- TTS functions are in scope (do NOT import): speak(text, { onEnd, onError }), cancelSpeech(), prefetchSpeech(text), prefetchAllScenes(narrations[])
 - NEVER use window.speechSynthesis directly — always use speak() and cancelSpeech().
 - CRITICAL: Scene progression must wait for BOTH the duration timer AND speech to finish.
   Use onEnd/onError callbacks in speak(text, { onEnd, onError }) — never advance on timer alone.
