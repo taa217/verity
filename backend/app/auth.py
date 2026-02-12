@@ -25,7 +25,8 @@ _jwks_cache_expiry: float = 0
 JWKS_CACHE_TTL = 3600  # 1 hour
 
 WORKOS_API_BASE = os.getenv("WORKOS_API_HOSTNAME", "https://api.workos.com")
-JWKS_URL = f"{WORKOS_API_BASE}/sso/jwks"
+WORKOS_CLIENT_ID = os.getenv("WORKOS_CLIENT_ID", "")
+JWKS_URL = f"{WORKOS_API_BASE}/sso/jwks/{WORKOS_CLIENT_ID}"
 
 security = HTTPBearer(auto_error=False)
 
@@ -59,7 +60,7 @@ async def verify_access_token(
         raise HTTPException(status_code=401, detail="Missing authorization token")
 
     token = credentials.credentials
-    client_id = os.getenv("WORKOS_CLIENT_ID", "")
+    client_id = WORKOS_CLIENT_ID
 
     try:
         jwks_data = await _fetch_jwks()
