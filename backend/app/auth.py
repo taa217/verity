@@ -60,7 +60,6 @@ async def verify_access_token(
         raise HTTPException(status_code=401, detail="Missing authorization token")
 
     token = credentials.credentials
-    client_id = WORKOS_CLIENT_ID
 
     try:
         jwks_data = await _fetch_jwks()
@@ -89,12 +88,13 @@ async def verify_access_token(
         if not rsa_key:
             raise HTTPException(status_code=401, detail="Unable to find signing key")
 
+        # WorkOS AuthKit access tokens do NOT contain an "aud" claim,
+        # so we must skip audience verification to avoid rejection.
         payload = jwt.decode(
             token,
             rsa_key,
             algorithms=["RS256"],
-            audience=client_id if client_id else None,
-            options={"verify_aud": bool(client_id)},
+            options={"verify_aud": False},
         )
         return payload
 
