@@ -9,6 +9,11 @@ import VisualizationLoader from "./components/VisualizationLoader";
 import LucidLogo from "./components/LucidLogo";
 import { prefetchAllScenes, cancelAllPrefetches, cancelSpeech } from "./services/ttsService";
 import { useAuthenticatedFetch } from "./hooks/useAuthenticatedFetch";
+import {
+  type AppError,
+  categorizeNetworkError,
+  categorizeHttpError,
+} from "./utils/errorUtils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,6 +87,10 @@ function App() {
   const [hasInteracted, setHasInteracted] = useState(false);
   const [envReady, setEnvReady] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [errorState, setErrorState] = useState<AppError | null>(null);
+
+  // Stores the last user message so we can retry on failure
+  const lastUserMessageRef = useRef<string>("");
 
   // Auto-collapse sidebar on mobile
   useEffect(() => {
@@ -89,7 +98,7 @@ function App() {
   }, [isMobile]);
 
   const isHero = !hasInteracted && messages.length === 0;
-  const showOverlayLoader = isLoading || !envReady;
+  const showOverlayLoader = isLoading || !envReady || !!errorState;
 
   const handleEnvReady = useCallback(() => setEnvReady(true), []);
 
@@ -108,23 +117,47 @@ function App() {
     setIsLoading(false);
     setHasInteracted(false);
     setEnvReady(false);
+    setErrorState(null);
+    lastUserMessageRef.current = "";
   };
 
-  // ---- Send message ----
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  // ---- Send message (also used for retry) ----
+  const handleSend = async (retryMessage?: string) => {
+    const userMessage = retryMessage || input;
+    if (!userMessage.trim() || isLoading) return;
 
-    const userMessage = input;
-    setInput("");
+    // Clear previous error
+    setErrorState(null);
+
+    // Only append to messages on a fresh send, not a retry
+    if (!retryMessage) {
+      setInput("");
+      setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    }
+
     setHasInteracted(true);
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
+    lastUserMessageRef.current = userMessage;
 
     try {
       const res = await authFetch("/chat", {
         method: "POST",
         body: JSON.stringify({ message: userMessage }),
       });
+
+      // Handle non-2xx responses
+      if (!res.ok) {
+        let serverDetail: string | undefined;
+        try {
+          const errorBody = await res.json();
+          serverDetail = errorBody.detail || errorBody.message;
+        } catch {
+          // Response wasn't JSON — ignore
+        }
+        setErrorState(categorizeHttpError(res.status, serverDetail));
+        return;
+      }
+
       const data = await res.json();
 
       const text =
@@ -148,15 +181,24 @@ function App() {
       }
     } catch (err) {
       console.error("Backend error:", err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Sorry, something went wrong connecting to the server.",
-        },
-      ]);
+      setErrorState(categorizeNetworkError(err));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // ---- Retry the last failed request ----
+  const handleRetry = () => {
+    if (!lastUserMessageRef.current) return;
+    handleSend(lastUserMessageRef.current);
+  };
+
+  // ---- Dismiss error (go back) ----
+  const handleDismissError = () => {
+    setErrorState(null);
+    // If there's no existing lesson, go back to hero
+    if (code === IDLE_CODE) {
+      handleNewSession();
     }
   };
 
@@ -291,7 +333,9 @@ function App() {
                       "New Lesson"
                     }
                     difficulty="intermediate"
-                    onCancel={() => setIsLoading(false)}
+                    error={errorState}
+                    onCancel={errorState ? handleDismissError : () => setIsLoading(false)}
+                    onRetry={handleRetry}
                   />
                 </div>
               )}
