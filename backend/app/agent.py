@@ -18,7 +18,7 @@ class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
     visual_state: Dict[str, Any]       # { code, scenes }
     execution_status: Literal[
-        "idle", "planning", "coding", "fixing"
+        "idle", "planning", "coding", "fixing", "modifying"
     ]
     error_log: List[str]
 
@@ -285,6 +285,39 @@ Now implement this lesson plan:
 """
 
 
+MODIFIER_PROMPT = """You are an expert React developer who modifies animated educational lesson components.
+
+You receive the current lesson code and a user's modification request.
+Apply ONLY the requested changes to the existing code. Do NOT rewrite the entire component from scratch.
+
+=== MODIFICATION GUIDELINES ===
+- Preserve all existing scenes, animations, and functionality unless explicitly asked to change them
+- Keep the same visual style, color scheme, and layout unless asked otherwise
+- If asked to "slow down": increase scene durations and add more pauses
+- If asked to "speed up": decrease scene durations
+- If asked to "simplify": reduce complexity, use simpler language in narrations
+- If asked to "add more detail": add more scenes or expand existing narrations
+- If asked about visual changes: modify colors, sizes, positions, animations as requested
+- If asked a conceptual follow-up question (e.g. "what about X?", "how does Y relate?"):
+  ADD new scenes that answer the question while keeping existing scenes intact,
+  or replace scenes with updated content that addresses the question in context.
+
+=== STRICT RULES ===
+1. Output ONLY `function App() { ... }` — NO imports, NO exports
+2. Never wrap in markdown fences. Never output "javascript" / "jsx" / "tsx" as text.
+3. Every scene must have meaningful SVG visuals — NOT just centered text.
+4. Only use: React hooks (useState, useEffect, useRef, useCallback, useMemo),
+   framer-motion (motion.*, AnimatePresence), SVG elements, inline styles
+5. TTS functions are in scope (do NOT import): speak(text, { onEnd, onError }), cancelSpeech(), prefetchSpeech(text), prefetchAllScenes(narrations[])
+6. NEVER use window.speechSynthesis directly — always use speak() and cancelSpeech()
+7. Scene progression must wait for BOTH the duration timer AND speech to finish.
+   Use onEnd/onError callbacks in speak(text, { onEnd, onError }).
+8. On mount, call prefetchAllScenes(scenes.map(s => s.narration)) to pre-load ALL audio.
+9. Include a progress bar at the bottom.
+10. Return the COMPLETE modified function — not just the changed parts.
+"""
+
+
 LESSON_FIXER_PROMPT = """You are a Code Fixer for animated React lesson components.
 
 You will receive:
@@ -321,6 +354,9 @@ def router_node(state: AgentState):
     if isinstance(last, HumanMessage) and str(last.content).startswith("System Error:"):
         return {"execution_status": "fixing"}
 
+    # Only route as modification if there is existing code to modify
+    has_existing_code = bool(state.get("visual_state", {}).get("code"))
+
     response = llm_router.invoke([
         SystemMessage(content=ROUTER_PROMPT),
         last,
@@ -331,6 +367,8 @@ def router_node(state: AgentState):
         dtype = decision.get("type", "new_topic")
         if dtype == "fix_error":
             return {"execution_status": "fixing"}
+        if dtype == "modification" and has_existing_code:
+            return {"execution_status": "modifying"}
         return {"execution_status": "planning"}
     except Exception:
         return {"execution_status": "planning"}
@@ -346,12 +384,32 @@ def planner_node(state: AgentState):
 
 
 def coder_node(state: AgentState):
-    """Generate or fix the React lesson component."""
+    """Generate, modify, or fix the React lesson component."""
     execution_status = state.get("execution_status", "coding")
+    messages = state["messages"]
 
+    # ---- Modification flow (follow-up while lesson is playing) ----
+    if execution_status == "modifying":
+        current_code = state.get("visual_state", {}).get("code", "")
+        user_request = get_text(messages[-1]) if messages else ""
+
+        response = llm_coder.invoke([
+            SystemMessage(content=MODIFIER_PROMPT),
+            HumanMessage(
+                content=(
+                    f"Current Code:\n{current_code}\n\n"
+                    f"Modification Request: {user_request}"
+                )
+            ),
+        ])
+        code = strip_fences(get_text(response))
+        return {
+            "visual_state": {"code": code},
+            "execution_status": "coding",
+        }
+
+    # ---- Error-fix flow ----
     if execution_status == "fixing":
-        # ---- Error-fix flow ----
-        messages = state["messages"]
         last = messages[-1]
         current_code = state.get("visual_state", {}).get("code", "")
 
@@ -368,7 +426,6 @@ def coder_node(state: AgentState):
         }
 
     # ---- Normal generation flow ----
-    messages = state["messages"]
     plan_text = get_text(messages[-1]) if messages else ""
 
     # Try to parse scenes from plan for metadata
@@ -407,8 +464,9 @@ workflow.add_edge(START, "router")
 
 
 def route_decision(state: AgentState) -> str:
-    if state.get("execution_status") == "fixing":
-        return "coder"
+    status = state.get("execution_status")
+    if status in ("fixing", "modifying"):
+        return "coder"       # skip planner — go straight to coder
     return "planner"
 
 

@@ -90,11 +90,23 @@ async def chat(request: ChatRequest, user: dict = Depends(get_current_user)):
     """
     try:
         logger.info(f"Chat request from user: {user.get('sub', 'unknown')}")
+
+        # Reconstruct conversation history so the agent has full context
+        history_messages = []
+        for msg in (request.history or []):
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if content:
+                history_messages.append((role, content))
+
+        # Append the current user message
+        history_messages.append(("user", request.message))
+
         inputs: Dict[str, Any] = {
-            "messages": [("user", request.message)],
+            "messages": history_messages,
         }
 
-        # Seed broken code for the fix flow
+        # Seed current code for the modification / fix flows
         if request.current_code:
             inputs["visual_state"] = {"code": request.current_code}
 
@@ -110,7 +122,13 @@ async def chat(request: ChatRequest, user: dict = Depends(get_current_user)):
             if len(narrations) > 3:
                 response_text += " ..."
         else:
-            response_text = "I've created an animated lesson for you!"
+            # Modification / fix flows don't produce scene metadata
+            is_modification = bool(request.current_code) and not request.message.startswith("System Error:")
+            response_text = (
+                "I've updated the lesson based on your feedback!"
+                if is_modification
+                else "I've created an animated lesson for you!"
+            )
 
         return {
             "response": response_text,

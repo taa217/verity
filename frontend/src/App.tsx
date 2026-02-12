@@ -139,10 +139,20 @@ function App() {
     setIsLoading(true);
     lastUserMessageRef.current = userMessage;
 
+    // Stop any ongoing speech from the current lesson
+    cancelSpeech();
+    cancelAllPrefetches();
+
     try {
       const res = await authFetch("/chat", {
         method: "POST",
-        body: JSON.stringify({ message: userMessage }),
+        body: JSON.stringify({
+          message: userMessage,
+          // On retry, the user msg is already in `messages` — exclude it to
+          // avoid duplication (the backend appends `message` itself).
+          history: retryMessage ? messages.slice(0, -1) : messages,
+          current_code: code !== IDLE_CODE ? code : undefined,
+        }),
       });
 
       // Handle non-2xx responses
