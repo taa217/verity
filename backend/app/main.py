@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Lucid Teaching Agent")
 
-# Allowed origins — local dev + production domain
+# Allowed origins — local dev + production domain + Vercel previews
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:3000",
@@ -29,9 +29,15 @@ ALLOWED_ORIGINS = [
     "https://lucid-ai.co",
 ]
 
+# Add extra origins from env (comma-separated) — useful for Vercel preview URLs
+_extra = os.getenv("ALLOWED_ORIGINS", "")
+if _extra:
+    ALLOWED_ORIGINS.extend(o.strip() for o in _extra.split(",") if o.strip())
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
