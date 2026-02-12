@@ -1,4 +1,7 @@
-from fastapi import FastAPI, HTTPException
+import os
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -6,6 +9,9 @@ import logging
 
 from app.agent import app as agent_app
 from app.tts import router as tts_router
+from app.auth import get_current_user
+
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -15,9 +21,17 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Lucid Teaching Agent")
 
+# Allowed origins — local dev + production domain
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://app.lucid-ai.co",
+    "https://lucid-ai.co",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,15 +74,16 @@ async def root():
 
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, user: dict = Depends(get_current_user)):
     """
-    Generate or fix a visual lesson.
+    Generate or fix a visual lesson. Requires a valid WorkOS access token.
 
     Returns:
         response    – human-readable summary text
         visual_state – { code, scenes? }
     """
     try:
+        logger.info(f"Chat request from user: {user.get('sub', 'unknown')}")
         inputs: Dict[str, Any] = {
             "messages": [("user", request.message)],
         }

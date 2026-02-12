@@ -8,6 +8,7 @@ import NativeCodeRenderer from "./components/NativeCodeRenderer";
 import VisualizationLoader from "./components/VisualizationLoader";
 import LucidLogo from "./components/LucidLogo";
 import { prefetchAllScenes, cancelAllPrefetches, cancelSpeech } from "./services/ttsService";
+import { useAuthenticatedFetch } from "./hooks/useAuthenticatedFetch";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,6 +72,7 @@ const IDLE_CODE = `function App() {
 // ---------------------------------------------------------------------------
 function App() {
   const isMobile = useIsMobile();
+  const authFetch = useAuthenticatedFetch();
 
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -125,9 +127,8 @@ function App() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8000/chat", {
+      const res = await authFetch("/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMessage }),
       });
       const data = await res.json();
@@ -196,9 +197,8 @@ function App() {
       setIsLoading(true);
 
       try {
-        const res = await fetch("http://localhost:8000/chat", {
+        const res = await authFetch("/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: `System Error: ${error}`,
             current_code: brokenCode,
@@ -224,7 +224,7 @@ function App() {
         setIsLoading(false);
       }
     },
-    [isLoading],
+    [isLoading, authFetch],
   );
 
   // ---- Render ----

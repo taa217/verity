@@ -8,6 +8,7 @@ import {
   Clock,
 } from "lucide-react";
 import LucidLogo from "./LucidLogo";
+import UserMenu from "./UserMenu";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -93,15 +94,7 @@ export default function Sidebar({
 
           {/* Footer / User */}
           <div className="sidebar__foot">
-            <div className="sidebar__user">
-              <div className="sidebar__avatar">G</div>
-              <div className="sidebar__user-detail">
-                <span className="sidebar__user-name">Guest User</span>
-                <span className="sidebar__user-email">
-                  Sign in for more features
-                </span>
-              </div>
-            </div>
+            <UserMenu />
           </div>
         </>
       )}
