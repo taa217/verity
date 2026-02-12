@@ -14,10 +14,10 @@ createRoot(document.getElementById("root")!).render(
     <AuthKitProvider
       clientId={env.workos.clientId}
       redirectUri={env.workos.redirectUri}
-      onRedirectCallback={({ state }) => {
+      onRedirectCallback={(params) => {
         // After auth, navigate to the path stored in state (or home)
-        const returnTo =
-          (state as { returnTo?: string } | undefined)?.returnTo ?? "/";
+        const state = params.state as { returnTo?: string } | undefined;
+        const returnTo = state?.returnTo ?? "/";
         window.history.replaceState({}, "", returnTo);
       }}
     >
