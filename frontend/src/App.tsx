@@ -79,8 +79,6 @@ function App() {
   const [code, setCode] = useState(IDLE_CODE);
 
   const [isLoading, setIsLoading] = useState(false);
-  const [showCode, setShowCode] = useState(false);
-  const [showChat, setShowChat] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [envReady, setEnvReady] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -89,8 +87,6 @@ function App() {
   useEffect(() => {
     setSidebarCollapsed(isMobile);
   }, [isMobile]);
-
-  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const isHero = !hasInteracted && messages.length === 0;
   const showOverlayLoader = isLoading || !envReady;
@@ -110,8 +106,6 @@ function App() {
     setMessages([]);
     setCode(IDLE_CODE);
     setIsLoading(false);
-    setShowCode(false);
-    setShowChat(false);
     setHasInteracted(false);
     setEnvReady(false);
   };
@@ -282,26 +276,9 @@ function App() {
           <div className="lesson-view">
             {/* Visual area */}
             <div className="visual-area">
-              {!showOverlayLoader && (
-                <div className="visual-controls">
-                  <button
-                    onClick={() => setShowChat(!showChat)}
-                    className={showChat ? "active" : ""}
-                  >
-                    {showChat ? "Hide Transcript" : "Transcript"}
-                  </button>
-                  <button
-                    onClick={() => setShowCode(!showCode)}
-                    className={showCode ? "active" : ""}
-                  >
-                    {showCode ? "Hide Code" : "Code"}
-                  </button>
-                </div>
-              )}
-
               <NativeCodeRenderer
                 code={code}
-                showCode={showCode}
+                showCode={false}
                 onCodeError={handleCodeError}
                 onReady={handleEnvReady}
               />
@@ -319,32 +296,6 @@ function App() {
                 </div>
               )}
             </div>
-
-            {/* Chat overlay */}
-            {showChat && (
-              <div className="chat-overlay">
-                <div className="chat-overlay-header">
-                  <span>Lesson Transcript</span>
-                  <button
-                    className="close-chat"
-                    onClick={() => setShowChat(false)}
-                  >
-                    &times;
-                  </button>
-                </div>
-                <div className="chat-messages">
-                  {messages.map((msg, i) => (
-                    <div key={i} className={`message-bubble ${msg.role}`}>
-                      {msg.content}
-                    </div>
-                  ))}
-                  {isLoading && (
-                    <div className="message-bubble assistant">Thinking...</div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-              </div>
-            )}
 
             {/* Bottom input */}
             <div className="lesson-input">
