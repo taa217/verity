@@ -42,7 +42,7 @@ export default function ChatInput({
       />
       <button
         className="send-btn"
-        onClick={onSend}
+        onClick={() => onSend()}
         disabled={disabled || !value.trim()}
         aria-label="Send message"
       >
