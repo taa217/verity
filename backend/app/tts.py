@@ -6,6 +6,7 @@ Body:      { "text": "...", "voice_id": "..." (optional) }
 Returns:   audio/wav bytes  (or 503 if Cartesia is unavailable)
 """
 
+import asyncio
 import hashlib
 import logging
 import os
@@ -35,6 +36,9 @@ _cache: OrderedDict[str, bytes] = OrderedDict()
 
 # Reusable async HTTP client (connection pooling)
 _http_client: Optional[httpx.AsyncClient] = None
+
+# Semaphore to limit concurrent Cartesia API calls (free tier allows max 2)
+_cartesia_semaphore = asyncio.Semaphore(2)
 
 
 def _get_client() -> httpx.AsyncClient:
@@ -92,47 +96,50 @@ async def text_to_speech(req: TTSRequest):
         logger.info("TTS cache hit for: %s…", text[:40])
         return Response(content=_cache[key], media_type="audio/wav")
 
-    # Call Cartesia
-    try:
-        client = _get_client()
-        resp = await client.post(
-            CARTESIA_API_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Cartesia-Version": CARTESIA_API_VERSION,
-                "Content-Type": "application/json",
-            },
-            json={
-                "model_id": CARTESIA_MODEL,
-                "transcript": text,
-                "voice": {"mode": "id", "id": voice_id},
-                "output_format": {
-                    "container": "wav",
-                    "encoding": "pcm_s16le",
-                    "sample_rate": SAMPLE_RATE,
+    # Call Cartesia (semaphore limits to 2 concurrent requests)
+    async with _cartesia_semaphore:
+        try:
+            client = _get_client()
+            resp = await client.post(
+                CARTESIA_API_URL,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Cartesia-Version": CARTESIA_API_VERSION,
+                    "Content-Type": "application/json",
                 },
-                "language": "en",
-            },
-        )
-
-        if resp.status_code != 200:
-            logger.warning(
-                "Cartesia returned %s: %s", resp.status_code, resp.text[:200]
+                json={
+                    "model_id": CARTESIA_MODEL,
+                    "transcript": text,
+                    "voice": {"mode": "id", "id": voice_id},
+                    "output_format": {
+                        "container": "wav",
+                        "encoding": "pcm_s16le",
+                        "sample_rate": SAMPLE_RATE,
+                    },
+                    "language": "en",
+                },
             )
+
+            if resp.status_code != 200:
+                logger.warning(
+                    "Cartesia returned %s: %s", resp.status_code, resp.text[:200]
+                )
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Cartesia API error ({resp.status_code}).",
+                )
+
+            audio_bytes = resp.content
+            _put_cache(key, audio_bytes)
+            logger.info(
+                "TTS generated for: %s… (%d bytes)", text[:40], len(audio_bytes)
+            )
+
+            return Response(content=audio_bytes, media_type="audio/wav")
+
+        except httpx.HTTPError as exc:
+            logger.error("Cartesia request failed: %s", exc)
             raise HTTPException(
                 status_code=503,
-                detail=f"Cartesia API error ({resp.status_code}).",
+                detail="Cartesia API unreachable — use browser TTS fallback.",
             )
-
-        audio_bytes = resp.content
-        _put_cache(key, audio_bytes)
-        logger.info("TTS generated for: %s… (%d bytes)", text[:40], len(audio_bytes))
-
-        return Response(content=audio_bytes, media_type="audio/wav")
-
-    except httpx.HTTPError as exc:
-        logger.error("Cartesia request failed: %s", exc)
-        raise HTTPException(
-            status_code=503,
-            detail="Cartesia API unreachable — use browser TTS fallback.",
-        )
