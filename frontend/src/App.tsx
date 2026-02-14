@@ -155,7 +155,7 @@ function App() {
         }),
       });
 
-      // Handle non-2xx responses
+      // Handle non-2xx responses (auth errors still return proper status codes)
       if (!res.ok) {
         let serverDetail: string | undefined;
         try {
@@ -168,7 +168,16 @@ function App() {
         return;
       }
 
+      // The backend uses a streaming response with keepalive whitespace to
+      // survive platform timeouts (Render free tier).  JSON.parse ignores the
+      // leading spaces, so res.json() works unchanged.  However, server errors
+      // during generation arrive as 200 with { detail } in the body.
       const data = await res.json();
+
+      if (data.detail && !data.response) {
+        setErrorState(categorizeHttpError(500, data.detail));
+        return;
+      }
 
       const text =
         typeof data.response === "string"
@@ -254,6 +263,7 @@ function App() {
         if (!res.ok) throw new Error("Fix request failed");
 
         const data = await res.json();
+        if (data.detail && !data.visual_state) throw new Error("Fix request failed");
         if (data.visual_state?.code) {
           setCode(data.visual_state.code);
           setMessages((m) => [

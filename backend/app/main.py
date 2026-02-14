@@ -1,8 +1,11 @@
+import asyncio
+import json
 import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import logging
@@ -84,60 +87,103 @@ async def chat(request: ChatRequest, user: dict = Depends(get_current_user)):
     """
     Generate or fix a visual lesson. Requires a valid WorkOS access token.
 
-    Returns:
-        response    – human-readable summary text
+    Uses a streaming response that sends periodic keepalive whitespace while
+    the AI is generating.  This prevents platform-level timeouts (e.g. Render's
+    free-tier ~30 s "time-to-first-byte" limit) without changing the JSON
+    contract — JSON.parse naturally ignores leading whitespace.
+
+    Returns (in the final JSON chunk):
+        response     – human-readable summary text
         visual_state – { code, scenes? }
     """
-    try:
-        logger.info(f"Chat request from user: {user.get('sub', 'unknown')}")
+    logger.info(f"Chat request from user: {user.get('sub', 'unknown')}")
 
-        # Reconstruct conversation history so the agent has full context
-        history_messages = []
-        for msg in (request.history or []):
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            if content:
-                history_messages.append((role, content))
+    # ---- Build LangGraph inputs (sync — fast) ----
+    history_messages: list = []
+    for msg in (request.history or []):
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if content:
+            history_messages.append((role, content))
 
-        # Append the current user message
-        history_messages.append(("user", request.message))
+    history_messages.append(("user", request.message))
 
-        inputs: Dict[str, Any] = {
-            "messages": history_messages,
-        }
+    inputs: Dict[str, Any] = {"messages": history_messages}
+    if request.current_code:
+        inputs["visual_state"] = {"code": request.current_code}
 
-        # Seed current code for the modification / fix flows
-        if request.current_code:
-            inputs["visual_state"] = {"code": request.current_code}
+    # ---- Streaming generator ----
+    async def _stream():
+        done = asyncio.Event()
+        container: Dict[str, Any] = {}
 
-        result = await agent_app.ainvoke(inputs)
+        async def _invoke():
+            try:
+                container["result"] = await agent_app.ainvoke(inputs)
+            except Exception as exc:
+                container["error"] = exc
+            finally:
+                done.set()
 
+        task = asyncio.create_task(_invoke())
+
+        # Send a keepalive space every 15 s so the first byte arrives
+        # quickly and the connection stays alive during long AI generation.
+        while not done.is_set():
+            yield b" "
+            try:
+                await asyncio.wait_for(asyncio.shield(done.wait()), timeout=15)
+            except asyncio.TimeoutError:
+                continue
+
+        # Ensure task has fully resolved
+        await task
+
+        # ---- Error path ----
+        if "error" in container:
+            logger.error(
+                f"Error in chat endpoint: {container['error']}",
+                exc_info=container["error"],
+            )
+            yield json.dumps({"detail": str(container["error"])}).encode()
+            return
+
+        # ---- Success path ----
+        result = container["result"]
         visual_state = result.get("visual_state", {})
         scenes = visual_state.get("scenes", [])
 
-        # Build a human-readable summary from the scene narrations
         if scenes:
-            narrations = [s.get("narration", "") for s in scenes if s.get("narration")]
-            response_text = " ".join(narrations[:3])           # first few sentences
+            narrations = [
+                s.get("narration", "") for s in scenes if s.get("narration")
+            ]
+            response_text = " ".join(narrations[:3])
             if len(narrations) > 3:
                 response_text += " ..."
         else:
-            # Modification / fix flows don't produce scene metadata
-            is_modification = bool(request.current_code) and not request.message.startswith("System Error:")
+            is_modification = (
+                bool(request.current_code)
+                and not request.message.startswith("System Error:")
+            )
             response_text = (
                 "I've updated the lesson based on your feedback!"
                 if is_modification
                 else "I've created an animated lesson for you!"
             )
 
-        return {
+        yield json.dumps({
             "response": response_text,
             "visual_state": visual_state,
-        }
+        }).encode()
 
-    except Exception as e:
-        logger.error(f"Error in chat endpoint: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return StreamingResponse(
+        _stream(),
+        media_type="application/json",
+        headers={
+            "X-Accel-Buffering": "no",   # prevent reverse-proxy buffering
+            "Cache-Control": "no-cache",
+        },
+    )
 
 
 if __name__ == "__main__":
